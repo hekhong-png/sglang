@@ -609,7 +609,7 @@ def build_kda_attention_fixture(
     except (AssertionError, ImportError, ModuleNotFoundError) as exc:
         testcase.skipTest(f"{case.backend} backend is not available: {exc}")
 
-    initialize_linear_attn_config(runner.server_args)
+    initialize_linear_attn_config()
     linear_backend = KDAAttnBackend(runner)
     backend = HybridLinearAttnBackend(full_backend, linear_backend, full_attn_layers=[])
     actual_module = ProjectedKDAAttention(

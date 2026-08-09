@@ -581,7 +581,7 @@ def build_lightning_attention_fixture(
     except (AssertionError, ImportError, ModuleNotFoundError) as exc:
         testcase.skipTest(f"{case.backend} backend is not available: {exc}")
 
-    initialize_linear_attn_config(runner.server_args)
+    initialize_linear_attn_config()
     backend = LightningAttentionBackend(runner)
     actual_module = ProjectedLightningAttention(
         num_heads=case.num_heads,

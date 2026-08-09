@@ -605,7 +605,7 @@ def build_gdn_attention_fixture(
     except (AssertionError, ImportError, ModuleNotFoundError) as exc:
         testcase.skipTest(f"{case.backend} backend is not available: {exc}")
 
-    initialize_linear_attn_config(runner.server_args)
+    initialize_linear_attn_config()
     linear_backend = GDNAttnBackend(runner)
     if case.linear_attn_prefill_backend == "flashinfer":
         from sglang.srt.layers.attention.linear.kernels.gdn_flashinfer import (

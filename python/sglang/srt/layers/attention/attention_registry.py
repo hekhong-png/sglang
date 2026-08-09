@@ -380,6 +380,11 @@ def attn_backend_wrapper(runner: "ModelRunner", full_attn_backend: "AttentionBac
             )
 
         check_environments()
+        # The auto-default travels through the published override: the TBO
+        # dispatcher invokes this creator three times (primary + 2 children),
+        # and on the replicas `flashinfer_gdn_prefill_default` early-returns
+        # on the already-published leaf, which `initialize_linear_attn_config`
+        # then reads back -- every replica lands on the same value.
         prefill_default = None
         if hybrid_gdn_config(runner.model_config) is not None and not is_npu():
             prefill_default = flashinfer_gdn_prefill_default(runner)
@@ -388,9 +393,7 @@ def attn_backend_wrapper(runner: "ModelRunner", full_attn_backend: "AttentionBac
                 "gdn_backend.sm100_flashinfer_default",
                 linear_attn_prefill_backend=prefill_default,
             )
-        initialize_linear_attn_config(
-            runner.server_args, prefill_default=prefill_default
-        )
+        initialize_linear_attn_config()
         hybrid_backend_cls = HybridLinearAttnBackend
         if hybrid_gdn_config(runner.model_config) is not None:
             if is_blackwell():

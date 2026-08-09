@@ -4,6 +4,7 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, Optional
 
+from sglang.srt.runtime_context import get_exec
 from sglang.srt.utils.common import rank0_log
 
 if TYPE_CHECKING:
@@ -58,19 +59,27 @@ _BACKENDS: Dict[str, Optional[LinearAttnKernelBackend]] = {
 }
 
 
-def initialize_linear_attn_config(
-    server_args: ServerArgs, prefill_default: Optional[str] = None
-):
-    base = server_args.linear_attn_backend
-    decode = server_args.linear_attn_decode_backend or base
-    prefill = server_args.linear_attn_prefill_backend or prefill_default or base
+def initialize_linear_attn_config():
+    """Project the published linear-attn backend config into the module table.
+
+    Reads the bags, not a handed record: the SM100 GDN auto-default is
+    published as an override (`gdn_backend.sm100_flashinfer_default`) before
+    this runs, and the TBO dispatcher builds three backend replicas -- each
+    replica's call lands on the same published value, so a re-initialization
+    cannot fall back to the base backend after the first one applied the
+    default.
+    """
+    mamba = get_exec().mamba
+    base = mamba.linear_attn_backend
+    decode = mamba.linear_attn_decode_backend or base
+    prefill = mamba.linear_attn_prefill_backend or base
 
     _BACKENDS["decode"] = LinearAttnKernelBackend(decode)
     _BACKENDS["prefill"] = LinearAttnKernelBackend(prefill)
 
     # Verify backend. Unset -> follow decode (flashinfer -> its recurrent kernel,
     # else triton), preserving historical behavior.
-    verify = server_args.linear_attn_verify_backend
+    verify = mamba.linear_attn_verify_backend
     if verify is None:
         verify = decode if _BACKENDS["decode"].is_flashinfer() else "triton"
     _BACKENDS["verify"] = LinearAttnKernelBackend(verify)

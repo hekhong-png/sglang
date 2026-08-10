@@ -76,14 +76,40 @@ class TestConfigBags(CustomTestCase):
         with self.assertRaises(ValueError):
             rc.get_memory()
 
-    def test_bag_values_match_server_args(self):
+    def test_the_bags_carry_what_resolution_produced(self):
+        """The projection is faithful: each leaf is the *resolved* value.
+
+        The reference is an independent resolution of the same raw input --
+        a fresh record, never published -- so the assertion is "bag ==
+        what resolution produces", not "bag == the instance publish copied
+        from" (`resolved_server_args_dict()` would be the latter: it reads
+        `vars(server_args)` back). Resolution is reproducible by contract
+        (`test_resolution_is_reproducible`), which is what makes the sibling a
+        valid stand-in for the pipeline's output. Step 12 keeps records at the
+        user's raw input; then the sibling's fields go raw and this assertion
+        starts failing for every resolution-written leaf, which is the signal
+        the bags became the only home of the effective value.
+        """
         sa = self._publish()
-        self.assertEqual(rc.get_exec().moe.moe_runner_backend, sa.moe_runner_backend)
-        self.assertEqual(rc.get_exec().kernel.attention_backend, sa.attention_backend)
-        self.assertEqual(rc.get_memory().hicache_ratio, sa.hicache_ratio)
+        reference = ServerArgs(model_path="dummy")
+        resolved = {
+            field.name: getattr(reference, field.name)
+            for field in dataclasses.fields(reference)
+        }
+        for accessor, leaf in (
+            (lambda: rc.get_exec().moe.moe_runner_backend, "moe_runner_backend"),
+            (lambda: rc.get_exec().kernel.attention_backend, "attention_backend"),
+            (lambda: rc.get_memory().hicache_ratio, "hicache_ratio"),
+            (lambda: rc.get_schedule().page_size, "page_size"),
+            (lambda: rc.get_serving().host, "host"),
+            (lambda: rc.get_model().model_path, "model_path"),
+        ):
+            with self.subTest(leaf=leaf):
+                self.assertEqual(accessor(), resolved[leaf])
+        # And the record agrees today, which is what step 12 changes: when this
+        # assertion starts failing for a resolution-written leaf, the flip
+        # landed and the bag is the only place the effective value lives.
         self.assertEqual(rc.get_schedule().page_size, sa.page_size)
-        self.assertEqual(rc.get_serving().host, sa.host)
-        self.assertEqual(rc.get_model().model_path, sa.model_path)
 
     def test_all_accessors_and_exec_subgroups(self):
         self._publish()
